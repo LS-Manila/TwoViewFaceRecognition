@@ -60,7 +60,7 @@ int main(){
 		
 	//Load the face recognizer algorithm	
 	Ptr<face::FaceRecognizer> model = face::createEigenFaceRecognizer();
-	model -> load("frontTrainerLBPH/eigenfaces_at.yml");
+	model -> load("frontFaceTrainer/eigenfaces_at.yml");
 	
 	Mat frame, image, frame_gry, foreground, background;
 	Mat frame2;	
