@@ -138,8 +138,13 @@ void faceDetectionFrontal(Mat frame1, Mat frontalBodyROI, Mat image1,
 	
 	vector<Rect> frontalFaces;
 	
-	frontalDetector.detectMultiScale(frontalBodyROI, frontalFaces, 1.1,
-		4, 0 | CASCADE_SCALE_IMAGE, Size(30, 30));
+	float searchScaleFactor = 1.1;          //How many sizes to search
+	int minNeighbors = 4;                   //Reliability vs many faces
+	int flags = 0 | CASCADE_SCALE_IMAGE;    //Search for many faces
+	Size minFeatureSize(30, 30);            //Smallest face size
+	
+	frontalDetector.detectMultiScale(frontalBodyROI, frontalFaces, 
+		searchScaleFactor, minNeighbors, flags, minFeatureSize);
 		
 	for(size_t j = 0; j < frontalFaces.size(); j++){
 		int faces_y1 = frontalFaces[j].y + boundRect[i].y;
