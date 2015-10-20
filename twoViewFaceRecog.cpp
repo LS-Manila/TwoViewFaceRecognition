@@ -1,3 +1,12 @@
+/***********************************************************************
+ *  	De La Salle University - Science and Technology Complex		   *
+ * 				FACE RECOGNITION USING TWO-VIEW IP CAMERA			   *
+ * 																	   *
+ * Jerome C. Cansado	Christian Glenn T. Hatol   Jhonas N. Primavera *
+ * 																	   *
+ * 					 Adviser: Engr. Melvin Cabatuan					   *
+ **********************************************************************/
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/face.hpp>
 
@@ -7,19 +16,25 @@ using namespace face;
 
 void backgroundSubtractionFrontal(Mat frame1, Mat image1, 
 	Ptr<BackgroundSubtractorMOG2> pMOG1, Ptr<FaceRecognizer> model1);
-void backgroundSubtractionProfile(Mat frame2, Ptr<BackgroundSubtractorMOG2> pMOG2,
-	Mat image2);
+void backgroundSubtractionProfile(Mat frame2, Mat image2,
+	Ptr<BackgroundSubtractorMOG2> pMOG2, Ptr<FaceRecognizer> model2);
 void faceDetectionFrontal(Mat frame1, Mat frontalBodyROI, Mat image1,
 	vector<Rect> boundRect,	Ptr<FaceRecognizer> model1, size_t i);
 void faceDetectionProfile(Mat frame2, Mat profileBodyROI, Mat image2, 
-	vector<Rect> boundRect, size_t i);
-void recognizeFrontal(Mat faceSmallFrontal, Mat image1, Ptr<FaceRecognizer> model1);
+	vector<Rect> boundRect, Ptr<FaceRecognizer> model2, size_t i);
+void eyeDetectionFrontal(Mat faceROI, vector<Rect> boundRect, 
+	vector<Rect> frontalFaces, size_t i, size_t j, Mat image1);
+void recognizeFrontal(Mat faceSmallFrontal, Mat image1,
+	Ptr<FaceRecognizer> model1);
+void recognizeProfile(Mat faceSmallProfile, Mat image2, 
+	Ptr<FaceRecognizer> model2);
 
 CascadeClassifier frontalDetector;
 CascadeClassifier profileDetector;
+CascadeClassifier eyeDetector;
 
-Point eyeLeft;
-Point eyeRight;
+Point eye_left;
+Point eye_right;
 
 string databaseName[] = {
 	"John Jhonas Primavera",
@@ -30,6 +45,37 @@ string databaseName[] = {
 	"Gerard Lou Libby",
 	"Ma. Joanna Venus"
 };
+
+string databaseStatus[] = {
+	"Student",
+	"Student",
+	"Student",
+	"Student",
+	"Student",
+	"Student",
+	"Student"
+};
+
+float distance(Point p1, Point p2)
+{
+	int dx = abs(p2.x - p1.x);
+	int dy = abs(p2.y - p1.y);
+	return sqrt(dx*dx + dy*dy);
+}
+
+ Mat rotate(Mat& image, double angle, Point centre)
+ {
+	Point2f src_center(centre.x, centre.y);
+	angle = angle*180.0/3.14157;
+	Mat rot_matrix = getRotationMatrix2D(src_center, angle, 1.0);
+	 
+	Mat rotated_image(Size(image.size().height, image.size().width), 
+		image.type());
+		
+	warpAffine(image, rotated_image, rot_matrix, image.size());
+	
+	return(rotated_image);
+ }
 
 void backgroundSubtractionFrontal(Mat frame1, Mat image1, 
 	Ptr<BackgroundSubtractorMOG2> pMOG1, Ptr<FaceRecognizer> model1)
@@ -44,13 +90,13 @@ void backgroundSubtractionFrontal(Mat frame1, Mat image1,
 	pMOG1 -> getBackgroundImage(backgroundFrontal);
 	
 	if(!backgroundFrontal.empty()){
-		//~ imshow("Background - Front", backgroundFrontal);
+		imshow("Background - Front", backgroundFrontal);
 	}
 	
 	medianBlur(foregroundFrontal, foregroundFrontal, 9);
 	erode(foregroundFrontal, foregroundFrontal, Mat());
 	dilate(foregroundFrontal, foregroundFrontal, Mat());
-	//~ imshow("Foreground - Front", foregroundFrontal);
+	imshow("Foreground - Front", foregroundFrontal);
 	
 	vector< vector<Point> > contours;
 	vector<Vec4i> hierarchy;
@@ -87,8 +133,8 @@ void backgroundSubtractionFrontal(Mat frame1, Mat image1,
 void faceDetectionFrontal(Mat frame1, Mat frontalBodyROI, Mat image1, 
 	vector<Rect> boundRect, Ptr<FaceRecognizer> model1, size_t i)
 {
-	equalizeHist(frontalBodyROI, frontalBodyROI);
-	imshow("Moving object 1", frontalBodyROI);
+	//~ equalizeHist(frontalBodyROI, frontalBodyROI);
+	//~ imshow("Moving object 1", frontalBodyROI);
 	
 	vector<Rect> frontalFaces;
 	
@@ -108,48 +154,92 @@ void faceDetectionFrontal(Mat frame1, Mat frontalBodyROI, Mat image1,
 		Point f1(frontalFaces[j].x + boundRect[i].x, faces_y1);
 		Point f2(frontalFaces[j].x + frontalFaces[j].width + boundRect[i].x, faces_y2);
 		rectangle(image1, f1, f2, Scalar(0, 0, 255), 2, 8, 0);
-		
+				
 		Rect ROI(f1, f2);
 		Mat faceROI = frame1(ROI);
-		Mat faceSmallFrontal;
-		int faceScale = 50;
-		
-		if(!faceROI.empty()){
-			if(faceROI.cols != faceScale){
-				resize(faceROI.clone(), faceSmallFrontal, Size(faceScale, faceScale));
-			}
-			else{
-				faceSmallFrontal = faceROI.clone();
-			}
-			imshow("Detected face", faceSmallFrontal);
-		}
-		else destroyWindow("Detected face");
-		recognizeFrontal(faceSmallFrontal, image1, model1);
+		equalizeHist(faceROI, faceROI);
+		imshow("Detedtec face", faceROI);
+		eyeDetectionFrontal(faceROI, boundRect, frontalFaces, i, j, image1);
 	}
 }
 
-void recognizeFrontal(Mat faceSmallFrontal, Mat image1, Ptr<FaceRecognizer> model1)
+void eyeDetectionFrontal(Mat faceROI, vector<Rect> boundRect,
+	vector<Rect> frontalFaces, size_t i, size_t j, Mat image1)
+{
+	vector<Rect> eyes;
+	
+	eyeDetector.detectMultiScale(faceROI, eyes, 1.1, 2, 0 | CV_HAAR_SCALE_IMAGE,
+		Size(30, 30));
+		
+	//If two (2) eyes were detected...
+	cout << eyes.size() << endl; 
+	if (eyes.size() == 2){
+		for (size_t k = 0; k < 2; k++){
+			Point eye_center(boundRect[i].x + frontalFaces[j].x + eyes[1-k].x + 
+				eyes[1-k].width/2, boundRect[i].y + frontalFaces[j].y + eyes[1-k].y	+ 
+				eyes[1-k].height/2);
+		
+			if (j==0) //Left eye
+			{ 
+				eye_left.x = eye_center.x;
+				eye_left.y = eye_center.y;
+			}
+			if (j==1) //Right eye
+			{  
+				eye_right.x = eye_center.x;
+				eye_right.y = eye_center.y;
+			}
+		}
+		circle(image1, eye_right, 4, Scalar(0,255,255), -1, 8, 0);
+		circle(image1, eye_left, 4, Scalar(0,255,255), -1, 8, 0);
+	}
+	
+	//Sometimes, the detected eyes are reversed so switch them
+	if (eye_right.x < eye_left.x){
+		int tmpX = eye_right.x;
+		int tmpY = eye_right.y;
+		eye_right.x = eye_left.x;
+		eye_right.y = eye_left.y;
+		eye_left.x = tmpX;
+		eye_left.y = tmpY;
+	}
+	
+}
+
+void recognizeFrontal(Mat faceSmallFrontal, Mat image1,
+	Ptr<FaceRecognizer> model1)
 {
 	int label = -1;
 	double confidence = 0.0;
 	
 	model1 -> predict(faceSmallFrontal, label, confidence);
 	
-	string nameText = format("Name: ", label);
+	cout << confidence << endl;
 	
-	if(confidence < 2300){
+	string nameText = format("Name: ", label);
+	string statusText = format("Status: ", label);
+	
+	//To avoid false recognition, accept only the predictions within
+	//a certain confidence level. 
+	if(confidence < 1580){
 		if(label >= 0 && label <= 6){
 			nameText.append(databaseName[label]);
+			statusText.append(databaseStatus[label]);
 		}
 	}
-	else nameText.append("Unknown");
+	else{
+		nameText.append("Unknown");
+		statusText.append("Unknown");
+	}
 	
 	putText(image1, nameText, Point(5, 30), FONT_HERSHEY_COMPLEX, 0.5,
 		Scalar(0, 0, 0), 1, LINE_8);
+	putText(image1, statusText, Point(5, 45), FONT_HERSHEY_COMPLEX, 0.5,
+		Scalar(0, 0, 0), 1, LINE_8);
 }
 
-void backgroundSubtractionProfile(Mat frame2, Ptr<BackgroundSubtractorMOG2> pMOG2,
-	Mat image2)
+void backgroundSubtractionProfile(Mat frame2, Mat image2, 
+	Ptr<BackgroundSubtractorMOG2> pMOG2, Ptr<FaceRecognizer> model2)
 {
 	Mat foregroundProfile, backgroundProfile;
 	
@@ -196,16 +286,16 @@ void backgroundSubtractionProfile(Mat frame2, Ptr<BackgroundSubtractorMOG2> pMOG
 			Rect bodyROI(boundRect[i].tl(), boundRect[i].br());
 			Mat profileBodyROI = frame2(bodyROI);
 			faceDetectionProfile(frame2, profileBodyROI, image2, 
-				boundRect, i);
+				boundRect, model2, i);
 		}
 	}
 }
 
 void faceDetectionProfile(Mat frame2, Mat profileBodyROI, Mat image2, 
-	vector<Rect> boundRect, size_t i)
+	vector<Rect> boundRect, Ptr<FaceRecognizer> model2, size_t i)
 {
 	equalizeHist(profileBodyROI, profileBodyROI);
-	imshow("Moving object 2", profileBodyROI);
+	//~ imshow("Moving object 2", profileBodyROI);
 	
 	vector<Rect> profileFaces;
 	
@@ -238,16 +328,48 @@ void faceDetectionProfile(Mat frame2, Mat profileBodyROI, Mat image2,
 			else{
 				faceSmallProfile = faceROI.clone();
 			}
-			imshow("Detected face", faceSmallProfile);
+			//~ imshow("Detected face", faceSmallProfile);
 		}
-		else destroyWindow("Detected face");
+		//~ else destroyWindow("Detected face");
 	}
+}
+
+void recognizeProfile(Mat faceSmallProfile, Mat image2, 
+	Ptr<FaceRecognizer> model2)
+{
+	int label = -1;
+	double confidence = 0.0;
+	
+	model2 -> predict(faceSmallProfile, label, confidence);
+	
+	cout << confidence << endl;
+	
+	string nameText = format("Name: ", label);
+	string statusText = format("Status: ", label);
+	
+	//To avoid false recognition, accept only the predictions within
+	//a certain confidence level. 
+	if(confidence < 1580){
+		if(label >= 0 && label <= 6){
+			nameText.append(databaseName[label]);
+			statusText.append(databaseStatus[label]);
+		}
+	}
+	else{
+		nameText.append("Unknown");
+		statusText.append("Unknown");
+	}
+	
+	putText(image2, nameText, Point(5, 30), FONT_HERSHEY_COMPLEX, 0.5,
+		Scalar(0, 0, 0), 1, LINE_8);
+	putText(image2, statusText, Point(5, 45), FONT_HERSHEY_COMPLEX, 0.5,
+		Scalar(0, 0, 0), 1, LINE_8);
 }
 
 int main(){
 	VideoCapture camera1, camera2;
-	camera1.open("MVI_5658.MOV");
-	camera2.open("front.mp4");
+	camera1.open("frontcam.avi");
+	camera2.open("sidecam.avi");
 	
 	//Initialize MOG2 background subtraction for front face (pMOG1) and
 	//profile face (pMOG2)
@@ -264,13 +386,36 @@ int main(){
 		cout << "--(!)Error loading faceDetector cascade." << endl;
 		exit(0);
 	}
-	
+	if (!eyeDetector.load("haarcascade_lefteye_2splits.xml")){
+		cout << "--(!)Error loading eyeDetector cascade." << endl;
+		exit(0);
+	}	
+		
 	//Load the face recognize algorithm
 	Ptr<FaceRecognizer> model1 = createEigenFaceRecognizer();
 	model1 -> load("frontFaceTrainer/eigenfaces_at.yml");
+	Ptr<FaceRecognizer> model2 = createEigenFaceRecognizer();
+	model2 -> load("sideFaceTrainer/eigenfaces_at.yml");
 	
 	Mat frame1, image1;
 	Mat frame2, image2;
+	
+	//~ namedWindow("Front face recognition", 0);
+	//~ resizeWindow("Front face recognition", 720, 480);
+	
+	//The detected face image should be of the same size as the images 
+	//in the database. These are some of the parameters for the face 
+	//image to be aligned, rotated, and resized.
+	
+	//Offset percentage of the face image to be resized
+	Point offset_pct;
+	offset_pct.x = 0.2*100;
+	offset_pct.y = offset_pct.x;
+	
+	//Size of the new and resized face image
+	Point dest_sz;
+	dest_sz.x = 50;
+	dest_sz.y = dest_sz.x;
 	
 	for(;;){
 		camera1 >> frame1;
@@ -280,10 +425,10 @@ int main(){
 			image2 = frame2.clone();
 			
 			backgroundSubtractionFrontal(frame1, image1, pMOG1, model1);
-			backgroundSubtractionProfile(frame2, pMOG2, image2);
+			backgroundSubtractionProfile(frame2, image2, pMOG2, model2);
 			
 			imshow("Front face recognition", image1);
-			imshow("Profile face recognition", image2);
+			//~ imshow("Profile face recognition", image2);
 		}
 		else exit(0);
 		int c = waitKey(27);
