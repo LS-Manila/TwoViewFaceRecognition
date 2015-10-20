@@ -1,10 +1,10 @@
 /***********************************************************************
- *  	De La Salle University - Science and Technology Complex		   *
- * 				FACE RECOGNITION USING TWO-VIEW IP CAMERA			   *
- * 																	   *
+ *  	De La Salle University - Science and Technology Complex        *
+ *              FACE RECOGNITION USING TWO-VIEW IP CAMERA              *
+ *                                                                     *
  * Jerome C. Cansado	Christian Glenn T. Hatol   Jhonas N. Primavera *
- * 																	   *
- * 					 Adviser: Engr. Melvin Cabatuan					   *
+ *                                                                     *
+ *                 Adviser: Engr. Melvin Cabatuan                      *
  **********************************************************************/
 
 #include <opencv2/opencv.hpp>
