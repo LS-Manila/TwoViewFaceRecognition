@@ -204,7 +204,7 @@ void detectProfileFaces(Mat profile_body_roi, vector<Rect>boundRectProfile,
 	float searchScaleFactor = 1.2;          //How many sizes to search
 	int minNeighbors = 2;                   //Reliability vs many faces
 	int flags = 0 | CASCADE_SCALE_IMAGE;    //Search for many faces
-	Size minFeatureSize(30, 30);            //Smallest face size
+	Size minFeatureSize(50, 50);            //Smallest face size
 	
 	rightProfileDetector.detectMultiScale(profile_body_roi, profileFaces,
 		searchScaleFactor, minNeighbors, flags, minFeatureSize);
@@ -303,6 +303,10 @@ void tallyFront(int label1, double confidence1){
 		if (label1 == 7) h_1++;
 		if (label1 == 8) i_1++;
 		if (label1 == 9) j_1++;
+		
+		//~ cout << a_1 << " " << b_1 << " " << c_1 << " " << d_1 << " " 
+		     //~ << e_1 << " " << f_1 << " " << g_1 << " " << h_1 << " " 
+		     //~ << i_1 << " " << j_1 << endl;
 }
 
 void tallyProfile(int label2, double confidence2){
@@ -316,6 +320,10 @@ void tallyProfile(int label2, double confidence2){
 		if (label2 == 7) h_2++;
 		if (label2 == 8) i_2++;
 		if (label2 == 9) j_2++;
+		
+		cout << a_2 << " " << b_2 << " " << c_2 << " " << d_2 << " " 
+		     << e_2 << " " << f_2 << " " << g_2 << " " << h_2 << " " 
+		     << i_2 << " " << j_2 << endl;
 }
 
 void compareAndAnalyze()
@@ -333,6 +341,9 @@ void compareAndAnalyze()
 		nameText = format("Name: Unknown");
 		statusText = format("Status: Unknown");
 	}
+	
+	cout << nameText << endl << statusText << endl << timeStamp << endl
+		     << "-----------------------------" << endl;	
 	
 	isFrontFaceDetected = false;
 	isProfileFaceDetected = false;
@@ -379,6 +390,12 @@ int main()
 	
 	vector< vector<Point> > contours_front, contours_profile;
 	vector<Vec4i> hierarchy;
+	
+	//~ cout << endl << "Number of recognized front faces for each label:" << endl
+	     //~ << "0 1 2 3 4 5 6 7 8 9" << endl;
+	     
+	cout << endl << "Number of recognized profile faces for each label:" << endl
+	     << "0 1 2 3 4 5 6 7 8 9" << endl;
 				
 	for(;;)
 	{
@@ -442,7 +459,7 @@ int main()
 			
 			////////////////////////////////////////////////////////////
 			
-			if (isFrontFaceDetected == true || isProfileFaceDetected == true)
+			if (isFrontFaceDetected == true && isProfileFaceDetected == true)
 			{
 				compareAndAnalyze();
 				cout << "Compared" << endl;
