@@ -17,7 +17,7 @@ int label1 = -1;
 int label2 = -1;
 int a_1 = 0, b_1 = 0, c_1 = 0, d_1 = 0, e_1 = 0, f_1 = 0, g_1 = 0, h_1 = 0, i_1 = 0, j_1 = 0;
 int a_2 = 0, b_2 = 0, c_2 = 0, d_2 = 0, e_2 = 0, f_2 = 0, g_2 = 0, h_2 = 0, i_2 = 0, j_2 = 0;
-int maxLabel1 = 0;
+int maxLabel1 = 0;	
 int maxLabel2 = 0;
 int frontFrameCounter = 0;
 int profileFrameCounter = 0;
@@ -43,29 +43,29 @@ void tallyProfile(int label2, double confidence2);
 void compareAndAnalyze();
 
 string databaseName[] = {
-	"Alexander Co Abad",
-	"Ariane Aguilar",
-	"Jerome Cansado",
-	"Ed Lorence De Guzman",
-	"Christian Glenn Hatol",
-	"Gerard Lou Libby",
-	"Xavier Palomares",
-	"John Jhonas Primavera",
-	"Aeysol Rosaldo",
-	"Ma. Joanna Venus"
+	"Alexander Co Abad",      //0
+	"Ariane Aguilar",         //1
+	"Jerome Cansado",         //2
+	"Ed Lorence De Guzman",   //3
+	"Christian Glenn Hatol",  //4
+	"Gerard Lou Libby",       //5
+	"Xavier Palomares",       //6
+	"John Jhonas Primavera",  //7
+	"Aeysol Rosaldo",         //8
+	"Ma. Joanna Venus"        //9
 };
 
 string databaseStatus[] = {
-	"Faculty",
-	"Student",
-	"Student",
-	"Student",
-	"Student",
-	"Student",
-	"Student",
-	"Student",
-	"Student",
-	"Student"
+	"Faculty",                //0
+	"Student",                //1
+	"Student",                //2
+	"Student",                //3
+	"Student",                //4
+	"Student",                //5
+	"Student",                //6
+	"Student",                //7
+	"Student",                //8
+	"Student"                 //9
 };
 
 Mat backgroundSubtractFront(Mat &gray1, Ptr<BackgroundSubtractorMOG2> pMOG2_front)
@@ -192,7 +192,7 @@ void detectFrontFaces(Mat front_body_roi, vector<Rect>boundRectFront,
 		for(int i=0;i<10;i++)
 		{
 			if(array[i]>maxLabel1)
-			maxLabel1=array[i];
+			maxLabel1=array[i]; 
 		}
 	}
 }
@@ -286,6 +286,11 @@ void recognizeProfileFaces(Mat face_scaled, Ptr<FaceRecognizer> modelProfile)
 	//~ cout << "LabelSide: " << label2 << endl;
 	//~ cout << "Confidence: " << confidence2 << endl;
 }
+
+//Functions tallyFront and tallyProfile tallies the number of recognized
+//faces for a given video sequence or person. The highest number of tallied
+//label will be set as maxLabel1 or maxLabel2 and will be considered as
+//the predicted label of the system.
 
 void tallyFront(int label1, double confidence1){
 		if (label1 == 0) a_1++;
