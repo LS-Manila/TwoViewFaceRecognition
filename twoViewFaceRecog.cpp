@@ -1,52 +1,46 @@
-/***********************************************************************
- *  	De La Salle University - Science and Technology Complex        *
- *              FACE RECOGNITION USING TWO-VIEW IP CAMERA              *
- *                                                                     *
- * Jerome C. Cansado	Christian Glenn T. Hatol   Jhonas N. Primavera *
- *                                                                     *
- *                 Adviser: Engr. Melvin Cabatuan                      *
- **********************************************************************/
-
 #include <opencv2/opencv.hpp>
 #include <opencv2/face.hpp>
-#include <fstream>
 
-using namespace std;
 using namespace cv;
+using namespace std;
 using namespace face;
 
-void backgroundSubtractionFrontal(Mat frame1, Mat image1, 
-	Ptr<BackgroundSubtractorMOG2> pMOG1, Ptr<FaceRecognizer> model1);
-void backgroundSubtractionProfile(Mat frame2, Mat image2,
-	Ptr<BackgroundSubtractorMOG2> pMOG2, Ptr<FaceRecognizer> model2);
-void faceDetectionFrontal(Mat frame1, Mat frontalBodyROI, Mat image1,
-	vector<Rect> boundRect,	Ptr<FaceRecognizer> model1, size_t i);
-void faceDetectionProfile(Mat frame2, Mat profileBodyROI, Mat image2, 
-	vector<Rect> boundRect, Ptr<FaceRecognizer> model2, size_t i);
-void eyeDetectionFrontal(Mat faceROI, vector<Rect> boundRect, Mat image1, Mat frame1,
-	vector<Rect> frontalFaces, size_t i, size_t j, Ptr<FaceRecognizer> model1);
-void recognizeFrontal(string fileName1, int Hour, int Min, int Sec, 
-	Mat image1,	Ptr<FaceRecognizer> model1);
-void recognizeProfile(string fileName2, Ptr<FaceRecognizer> model2);
-void alignRotateCrop(Mat frame1, Mat image1, Ptr<FaceRecognizer> model1);
-void writeData(string nameText, string statusText, string timeStamp);
-void compareResults(int label1, int label2, double cofidence1, 
-	double confidence2, int Hour, int Min, int Sec);
+CascadeClassifier frontFaceDetector;
+CascadeClassifier rightProfileDetector;
 
-CascadeClassifier frontalDetector;
-CascadeClassifier profileDetector;
-CascadeClassifier eyeDetector;
+bool isFrontFaceDetected = false;
+bool isProfileFaceDetected = false;
 
-Point eye_left;
-Point eye_right;
+//~ bool static isRunOnce = true;
 
-int framesPerDetection;
 int label1 = -1;
 int label2 = -1;
+int a_1 = 0, b_1 = 0, c_1 = 0, d_1 = 0, e_1 = 0, f_1 = 0, g_1 = 0, h_1 = 0, i_1 = 0, j_1 = 0;
+int a_2 = 0, b_2 = 0, c_2 = 0, d_2 = 0, e_2 = 0, f_2 = 0, g_2 = 0, h_2 = 0, i_2 = 0, j_2 = 0;
+int maxLabel1 = 0;
+int maxLabel2 = 0;
+int frontFrameCounter = 0;
+int profileFrameCounter = 0;
 double confidence1 = 0.0;
 double confidence2 = 0.0;
-stringstream ssTime;
+
 string timeStamp;
+
+void detectFrontFaces(Mat front_body_roi, vector<Rect>boundRectFront,
+     size_t f, Mat image1, Mat frame1_gray, Ptr<FaceRecognizer> modelFront);
+     
+void detectProfileFaces(Mat profile_body_roi, vector<Rect>boundRectProfile,
+	 size_t p, Mat image2, Mat frame2_gray, Ptr<FaceRecognizer> modelProfile);
+	 
+void recognizeFrontFaces(Mat face_scaled, Ptr<FaceRecognizer> modelFront);
+
+void recognizeProfileFaces(Mat face_scaled, Ptr<FaceRecognizer> modelProfile);
+
+void tallyFront(int label1, double confidence1);
+
+void tallyProfile(int label2, double confidence2);
+
+void compareAndAnalyze();
 
 string databaseName[] = {
 	"Alexander Co Abad",
@@ -74,526 +68,388 @@ string databaseStatus[] = {
 	"Student"
 };
 
-float Distance(Point p1, Point p2)
+Mat backgroundSubtractFront(Mat &gray1, Ptr<BackgroundSubtractorMOG2> pMOG2_front)
 {
-	int dx = abs(p2.x - p1.x);
-	int dy = abs(p2.y - p1.y);
-	return sqrt(dx*dx + dy*dy);
+	Mat foreground, background;
+	
+	pMOG2_front -> apply(gray1, foreground);
+	pMOG2_front -> getBackgroundImage(background);
+	
+	//~ imshow("Background - Front", background);
+	
+	medianBlur(foreground, foreground, 9);
+	Mat element = getStructuringElement(MORPH_RECT, Size(3,3), Point(1,1));
+	Mat kernel;
+	morphologyEx(foreground, foreground, MORPH_CLOSE, kernel, Point(-1,-1), 5);
+	erode(foreground, foreground, element);
+	dilate(foreground, foreground, element);
+	
+	//~ imshow("Foreground - Front", foreground);
+		
+	Mat threshold_output;
+	
+	threshold(foreground, threshold_output, 45, 255, THRESH_BINARY);
+		             
+	return threshold_output;
 }
 
- Mat rotate(Mat& image, double angle, Point centre)
- {
-	Point2f src_center(centre.x, centre.y);
-	angle = angle*180.0/3.14157;
-	Mat rot_matrix = getRotationMatrix2D(src_center, angle, 1.0);
-	 
-	Mat rotated_image(Size(image.size().height, image.size().width), 
-		image.type());
-		
-	warpAffine(image, rotated_image, rot_matrix, image.size());
-	
-	return(rotated_image);
- }
-
-void backgroundSubtractionFrontal(Mat frame1, Mat image1, 
-	Ptr<BackgroundSubtractorMOG2> pMOG1, Ptr<FaceRecognizer> model1)
+Mat backgroundSubtractProfile(Mat &gray2, Ptr<BackgroundSubtractorMOG2> pMOG2_profile)
 {
-	Mat foregroundFrontal, backgroundFrontal;
-	
-	cvtColor(frame1, frame1, CV_RGB2GRAY);
-	
-	//Compute the foreground mask and the background image for front 
-	//face detection
-	pMOG1 -> apply(frame1, foregroundFrontal);
-	pMOG1 -> getBackgroundImage(backgroundFrontal);
-	
-	if(!backgroundFrontal.empty()){
-		imshow("Background - Front", backgroundFrontal);
-	}
-	
-	medianBlur(foregroundFrontal, foregroundFrontal, 9);
-	erode(foregroundFrontal, foregroundFrontal, Mat());
-	dilate(foregroundFrontal, foregroundFrontal, Mat());
-	imshow("Foreground - Front", foregroundFrontal);
-	
-	vector< vector<Point> > contours;
-	vector<Vec4i> hierarchy;
-	Mat thresholdOutput;
-	
-	threshold(foregroundFrontal, thresholdOutput, 45, 255, THRESH_BINARY);
-	findContours(thresholdOutput, contours, hierarchy, CV_RETR_TREE,
-		CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-	
-	vector< vector<Point> > contoursPoly(contours.size());
-	vector<Rect> boundRect(contours.size());
-	
-	Mat drawing = Mat::zeros(thresholdOutput.size(), CV_8UC3);
-	double area;
-	int thresholdArea = 9500;
-	
-	for(size_t i = 0; i < contours.size(); i++){
-		area = contourArea(contours[i]);
+	Mat foreground, background;
 		
-		if(area > thresholdArea){
-			drawContours(drawing, contours, i, Scalar(255, 0, 0), 2, 8,
-				hierarchy, 0, Point());
-			boundRect[i] = boundingRect(contours[i]);
-			rectangle(image1, boundRect[i].tl(), boundRect[i].br(),
-				Scalar(0, 255, 0), 2, 8, 0);
-			Rect bodyROI(boundRect[i].tl(), boundRect[i].br());
-			Mat frontalBodyROI = frame1(bodyROI);
-			faceDetectionFrontal(frame1, frontalBodyROI, image1, 
-				boundRect, model1, i);
-		}
-	}
+	pMOG2_profile -> apply(gray2, foreground);
+	pMOG2_profile -> getBackgroundImage(background);
+	
+	//~ imshow("Background - Right Profile", background);
+	
+	medianBlur(foreground, foreground, 9);
+	Mat element = getStructuringElement(MORPH_RECT, Size(3,3), Point(1,1));
+	Mat kernel;
+	morphologyEx(foreground, foreground, MORPH_CLOSE, kernel, Point(-1,-1), 5);
+	erode(foreground, foreground, element);
+	dilate(foreground, foreground, element);
+	
+	//~ imshow("Foreground - Right Profile", foreground);
+		
+	Mat threshold_output;
+	
+	threshold(foreground, threshold_output, 45, 255, THRESH_BINARY);
+		             
+	return threshold_output;
 }
 
-void faceDetectionFrontal(Mat frame1, Mat frontalBodyROI, Mat image1, 
-	vector<Rect> boundRect, Ptr<FaceRecognizer> model1, size_t i)
-{
-	equalizeHist(frontalBodyROI, frontalBodyROI);
-	//~ imshow("Moving object 1", frontalBodyROI);
-	
+void detectFrontFaces(Mat front_body_roi, vector<Rect>boundRectFront,
+     size_t f, Mat image1, Mat frame1_gray, Ptr<FaceRecognizer> modelFront)
+{	
 	vector<Rect> frontalFaces;				//Detected object(s)	
 	float searchScaleFactor = 1.1;          //How many sizes to search
 	int minNeighbors = 4;                   //Reliability vs many faces
 	int flags = 0 | CASCADE_SCALE_IMAGE;    //Search for many faces
 	Size minFeatureSize(30, 30);            //Smallest face size
 	
-	frontalDetector.detectMultiScale(frontalBodyROI, frontalFaces, 
+	frontFaceDetector.detectMultiScale(front_body_roi, frontalFaces,
 		searchScaleFactor, minNeighbors, flags, minFeatureSize);
 		
-	if(frontalFaces.size() == 0){   //If the program does not detect any
-		framesPerDetection = 0;     //faces, set the counter to zero.
-	}	
+	if(frontalFaces.size() != 0){	//If faces are detected
+		isFrontFaceDetected = true;
 		
-	for(size_t j = 0; j < frontalFaces.size(); j++){
-		int faces_y1 = frontalFaces[j].y + boundRect[i].y;
-		if (faces_y1 < 0){
-			faces_y1 = 0;
-		}
-		int faces_y2 = frontalFaces[j].y + frontalFaces[j].height + boundRect[i].y;
-		if (faces_y2 > frontalBodyROI.rows){
-			faces_y2 = frontalBodyROI.rows;
-		}
-		
-		Point f1(frontalFaces[j].x + boundRect[i].x, faces_y1);
-		Point f2(frontalFaces[j].x + frontalFaces[j].width + boundRect[i].x, faces_y2);
-		rectangle(image1, f1, f2, Scalar(0, 0, 255), 2, 8, 0);
+		for(size_t i = 0; i < 1; i++)
+		{
+			int faces_y1 = frontalFaces[i].y + boundRectFront[f].y;
+			
+			int faces_y2 = frontalFaces[i].y + frontalFaces[i].height + boundRectFront[f].y;
+			
+			Point f1(frontalFaces[i].x + boundRectFront[f].x, faces_y1);
+			Point f2(frontalFaces[i].x + frontalFaces[i].width + boundRectFront[f].x, faces_y2);
+			rectangle(image1, f1, f2, Scalar(0,0,255), 2, 8, 0);
+			
+			//~ cout << "asdf: " << frontalFaces[i].x + frontalFaces[i].width + boundRectFront[f].x << endl;
+			
+			Rect ROI(f1, f2);
+			Mat faceROI = frame1_gray(ROI);
+			Mat face_scaled;
+			
+			if(!faceROI.empty())
+			{
+				frontFrameCounter++;
 				
-		Rect ROI(f1, f2);
-		Mat faceROI = frame1(ROI);
-		equalizeHist(faceROI, faceROI);
-		imshow("Detected face", faceROI);
-		
-		eyeDetectionFrontal(faceROI, boundRect, image1, frame1, 
-			frontalFaces, i, j, model1);
-		
-		framesPerDetection++;
-	}
-}
-
-void eyeDetectionFrontal(Mat faceROI, vector<Rect> boundRect, Mat image1, Mat frame1,
-	vector<Rect> frontalFaces, size_t i, size_t j, Ptr<FaceRecognizer> model1)
-{
-	vector<Rect> eyes;
-	
-	eyeDetector.detectMultiScale(faceROI, eyes, 1.1, 2, 0 | CV_HAAR_SCALE_IMAGE,
-		Size(30, 30));
-		
-	//If two (2) eyes were detected...
-	//~ cout << eyes.size() << endl; 
-	if (eyes.size() == 2){
-		for (size_t k = 0; k < 2; k++){
-			Point eye_center(boundRect[i].x + frontalFaces[j].x + eyes[1-k].x + 
-				eyes[1-k].width/2, boundRect[i].y + frontalFaces[j].y + eyes[1-k].y + 
-				eyes[1-k].height/2);
-		
-			if (j==0) //Left eye
-			{ 
-				eye_left.x = eye_center.x;
-				eye_left.y = eye_center.y;
-			}
-			if (j==1) //Right eye
-			{  
-				eye_right.x = eye_center.x;
-				eye_right.y = eye_center.y;
-			}
-		}		
-	}
-	
-	//Sometimes, the detected eyes are reversed so switch them
-	if (eye_right.x < eye_left.x){
-		int tmpX = eye_right.x;
-		int tmpY = eye_right.y;
-		eye_right.x = eye_left.x;
-		eye_right.y = eye_left.y;
-		eye_left.x = tmpX;
-		eye_left.y = tmpY;
-	}
-	
-	circle(image1, eye_right, 4, Scalar(0,255,255), -1, 8, 0);
-	circle(image1, eye_left, 4, Scalar(0,255,255), -1, 8, 0);
-	
-	alignRotateCrop(frame1, image1, model1);
-	
-}
-
-void alignRotateCrop(Mat frame1, Mat image1, Ptr<FaceRecognizer> model1)
-{
-	//Offset percentage
-	Point offset_pct;
-	offset_pct.x = 0.2*100;
-	offset_pct.y = offset_pct.x;
-	
-	//Size of new picture
-	Point dest_sz;
-	dest_sz.x = 50;
-	dest_sz.y = dest_sz.x;
-	
-	//Calculate offsets in original image
-	int offset_h = (offset_pct.x*dest_sz.x/100);
-	int offset_v = (offset_pct.y*dest_sz.y/100);
-			
-	//Get the direction
-	Point eye_direction;
-	eye_direction.x = eye_right.x - eye_left.x;
-	eye_direction.y = eye_right.y - eye_left.y;
-			
-	//Calculate rotation angle in radians
-	float rotation = atan2((float)(eye_direction.y),
-	(float)(eye_direction.x));
+				if(faceROI.cols != 50 && faceROI.rows!= 50){
+					resize(faceROI.clone(), face_scaled, Size(50,50));
+				}
+				else{
+					face_scaled = faceROI.clone();
+				}
+				equalizeHist(face_scaled, face_scaled);
+				imshow("Detected front face", face_scaled);
+				if(frontFrameCounter == 1){
+					time_t currentTime;
+					struct tm *localTime;
+					time( &currentTime );                   // Get the current time
+					localTime = localtime( &currentTime );  // Convert the current time to the local time
+				
+					int Hour   = localTime->tm_hour;
+					int Min    = localTime->tm_min;
+					int Sec    = localTime->tm_sec;
+								
+					stringstream ss;
 					
-	//Distance between them
-	float dist = Distance(eye_left, eye_right);
+					ss << "Time: " << Hour << ":" << Min << ":" << Sec;
+					timeStamp = ss.str();
+					ss.str("");
+				}
 				
-	//Calculate the reference eye-width
-	int reference = dest_sz.x - 2*offset_h;
-				
-	//Scale factor
-	float scale = dist/(float)reference;
-				
-	//Rotate original image around the left eye
-	Mat frameRot = rotate(frame1, (double)rotation, eye_left);
-		
-	imshow("Rotated image", frameRot);
-			
-	//Crop the rotated image
-	Point crop_xy;		//Top left corner coordinates
-	crop_xy.x = eye_left.x - scale*offset_h;
-	crop_xy.y = eye_left.y - scale*offset_v;
-					
-	Point crop_size;
-	crop_size.x = dest_sz.x*scale;	//Cropped image width
-	crop_size.y = dest_sz.y*scale;	//Cropped image height
-				
-	//Crop the full image 
-	Rect myROI(crop_xy.x, crop_xy.y, crop_size.x, crop_size.y);
-	if((crop_xy.x + crop_size.x < frameRot.size().width) &&
-		(crop_xy.y + crop_size.y < frameRot.size().height)){
-			frameRot = frameRot(myROI);
+				recognizeFrontFaces(face_scaled, modelFront);
+			}
 		}
+	}
 	else{
-		cout << "Error cropping" << endl;
+		frontFrameCounter = 0;
+		int array[10] = 
+			{
+				a_1, b_1, c_1, d_1, e_1, f_1, g_1, h_1, i_1, j_1
+			};
+
+		for(int i=0;i<10;i++)
+		{
+			if(array[i]>maxLabel1)
+			maxLabel1=array[i];
+		}
+	}
+}
+
+void detectProfileFaces(Mat profile_body_roi, vector<Rect>boundRectProfile,
+	 size_t p, Mat image2, Mat frame2_gray, Ptr<FaceRecognizer> modelProfile)
+{	
+	vector<Rect> profileFaces;				//Detected object(s)	
+	float searchScaleFactor = 1.2;          //How many sizes to search
+	int minNeighbors = 2;                   //Reliability vs many faces
+	int flags = 0 | CASCADE_SCALE_IMAGE;    //Search for many faces
+	Size minFeatureSize(30, 30);            //Smallest face size
+	
+	rightProfileDetector.detectMultiScale(profile_body_roi, profileFaces,
+		searchScaleFactor, minNeighbors, flags, minFeatureSize);
+		
+	if(profileFaces.size() !=0){
+		isProfileFaceDetected = true;
+		
+		for(size_t i = 0; i < 1; i++)
+		{
+			int faces_y1 = profileFaces[i].y + boundRectProfile[p].y;
+			
+			int faces_y2 = profileFaces[i].y + profileFaces[i].height + boundRectProfile[p].y;
+			
+			Point f1(profileFaces[i].x + boundRectProfile[p].x, faces_y1);
+			Point f2(profileFaces[i].x + profileFaces[i].width + boundRectProfile[p].x, faces_y2);
+			rectangle(image2, f1, f2, Scalar(0,0,255), 2, 8, 0);
+			
+			Rect ROI(f1, f2);
+			Mat faceROI = frame2_gray(ROI);
+			Mat face_scaled;
+			
+			profileFrameCounter++;
+			stringstream ss;
+				string file;
+				ss << profileFrameCounter<<".pgm";
+				file = ss.str();
+				imwrite(file, faceROI);
+			
+						
+			if(!faceROI.empty())
+			{
+				
+				if(faceROI.cols != 50 && faceROI.rows!= 50){
+					resize(faceROI, face_scaled, Size(50, 50));
+				}
+				else{
+					face_scaled = faceROI;
+				}			
+					
+				
+				imshow("Detected profile face", face_scaled);
+				recognizeProfileFaces(face_scaled, modelProfile);
+			}
+		}
+	}
+	else{
+		profileFrameCounter = 0;
+		int array[10] = 
+			{
+				a_2, b_2, c_2, d_2, e_2, f_2, g_2, h_2, i_2, j_2
+			};
+
+		for(int i=0;i<10;i++)
+		{
+			if(array[i]>maxLabel2)
+			maxLabel2=array[i];
+		}
+	}
+}
+
+void recognizeFrontFaces(Mat face_scaled, Ptr<FaceRecognizer> modelFront)
+{
+	
+	modelFront -> predict(face_scaled, label1, confidence1);
+	
+	tallyFront(label1, confidence1);
+	
+	//~ cout << "LabelFront: " << label1 << endl;
+	//~ cout << "Confidence: " << confidence1 << endl;
+}
+
+void recognizeProfileFaces(Mat face_scaled, Ptr<FaceRecognizer> modelProfile)
+{
+	
+	modelProfile -> predict(face_scaled, label2, confidence2);
+	
+	tallyProfile(label2, confidence2);
+	
+	//~ cout << "LabelSide: " << label2 << endl;
+	//~ cout << "Confidence: " << confidence2 << endl;
+}
+
+void tallyFront(int label1, double confidence1){
+		if (label1 == 0) a_1++;
+		if (label1 == 1) b_1++;
+		if (label1 == 2) c_1++;
+		if (label1 == 3) d_1++;
+		if (label1 == 4) e_1++;
+		if (label1 == 5) f_1++;
+		if (label1 == 6) g_1++;
+		if (label1 == 7) h_1++;
+		if (label1 == 8) i_1++;
+		if (label1 == 9) j_1++;
+}
+
+void tallyProfile(int label2, double confidence2){
+		if (label2 == 0) a_2++;
+		if (label2 == 1) b_2++;
+		if (label2 == 2) c_2++;
+		if (label2 == 3) d_2++;
+		if (label2 == 4) e_2++;
+		if (label2 == 5) f_2++;
+		if (label2 == 6) g_2++;
+		if (label2 == 7) h_2++;
+		if (label2 == 8) i_2++;
+		if (label2 == 9) j_2++;
+}
+
+void compareAndAnalyze()
+{
+	string nameText, statusText;
+	
+	if (maxLabel1 == maxLabel2){
+		nameText = format("Name: ", maxLabel1);
+		statusText = format("Status: ", maxLabel1);
+		
+		nameText.append(databaseName[maxLabel1]);
+		statusText.append(databaseStatus[maxLabel1]);
+	}	
+	else{
+		nameText = format("Name: Unknown");
+		statusText = format("Status: Unknown");
+	}
+		
+	if (isRunOnce){
+		cout << nameText << endl << statusText << endl << timeStamp << endl
+		     << "-----------------------------" << endl;	
+		//~ isRunOnce = false;
+	}
+}
+
+int main()	
+{
+	VideoCapture camera1, camera2;
+	camera1.open("videos/ian2front.avi");
+	camera2.open("videos/ian2side.avi");
+		
+	if(!camera1.isOpened()){
+		cout << "Error opening front camera." << endl;
 		exit(0);
 	}
 	
-	Mat faceSmallFrontal;
-	
-	if(!frameRot.empty()){
-		if(frameRot.cols != dest_sz.x){
-			resize(frameRot, faceSmallFrontal, Size(dest_sz));	
-		}
-		else{
-			faceSmallFrontal = frameRot;
-		}
-		equalizeHist(faceSmallFrontal, faceSmallFrontal);
-		imshow("Cropped image", faceSmallFrontal);	
-		if(framesPerDetection == 4){ //Capture the 4th frame
-			time_t currentTime;
-			struct tm *localTime;
-			
-			imshow("Saved image", faceSmallFrontal);
-
-			time( &currentTime );                   // Get the current time
-			localTime = localtime( &currentTime );  // Convert the current time to the local time
-		
-			int Hour   = localTime->tm_hour;
-			int Min    = localTime->tm_min;
-			int Sec    = localTime->tm_sec;
-						
-			stringstream ss;
-			string fileName1;
-			ss << Hour << "-" << Min << "-" << Sec << "-frontal" << ".pgm";
-			fileName1 = ss.str();
-			ss.str("");
-			imwrite(fileName1, faceSmallFrontal);
-			
-			recognizeFrontal(fileName1, Hour, Min, Sec, image1, model1);
-		}					
+	if(!camera2.isOpened()){
+		cout << "Error opening side camera." << endl;
+		exit(0);
 	}
-}
-
-void recognizeFrontal(string fileName1, int Hour, int Min, int Sec, 
-	Mat image1,	Ptr<FaceRecognizer> model1)
-{
-	Mat scaledFace1 = imread(fileName1, CV_LOAD_IMAGE_UNCHANGED);
-	
-	model1 -> predict(scaledFace1, label1, confidence1);
-	
-	compareResults(label1, label2, confidence1, confidence2, Hour, Min,
-		Sec);
-}
-
-void compareResults(int label1, int label2, double cofidence1, 
-	double confidence2, int Hour, int Min, int Sec)
-{
-	int label = -1;
-	double confidence = 0.0;
-	
-	if (label1 != -1 && label2 != -1 && confidence1 != 0 && confidence2 != 0){
-		if (confidence1 < confidence2){
-			label = label1;
-		}	
-		else{
-			label = label2;
-		}
-		
-		string nameText = format("Name: ", label);
-		string statusText = format("Status: ", label);
-			
-		ssTime << "Time: " << Hour << ":" << Min << ":" << Sec;
-		timeStamp = ssTime.str();
-		ssTime.str("");
-		
-		if(confidence < 1580){
-			if(label >= 0 && label <= 9){
-				nameText.append(databaseName[label]);
-				statusText.append(databaseStatus[label]);
-			}
-		}
-		else{
-			nameText.append("Unknown");
-			statusText.append("Unknown");		
-	}
-	
-	cout << nameText << endl << statusText << endl << timeStamp << endl
-		 << "-----------------------------" << endl;
-		 
-	writeData(nameText, statusText, timeStamp);
-	}
-}
-
-void writeData(string nameText, string statusText, string timeStamp){
-	
-	fstream oStrm;
-	oStrm.open("data.txt", fstream::in | fstream::out | fstream::app);
-		
-	oStrm << nameText << endl << statusText << endl << timeStamp 
-		  << endl << "-----------------------------" << endl;
-	oStrm.close();	
-}
-
-void backgroundSubtractionProfile(Mat frame2, Mat image2, 
-	Ptr<BackgroundSubtractorMOG2> pMOG2, Ptr<FaceRecognizer> model2)
-{
-	Mat foregroundProfile, backgroundProfile;
-	
-	cvtColor(frame2, frame2, CV_RGB2GRAY);
-	
-	//Compute the foreground mask and the background image for side 
-	//face detection
-	pMOG2 -> apply(frame2, foregroundProfile);
-	pMOG2 -> getBackgroundImage(backgroundProfile);
-	
-	if(!backgroundProfile.empty()){
-		//~ imshow("Background - Profile", backgroundProfile);
-	}
-	
-	medianBlur(foregroundProfile, foregroundProfile, 9);
-	erode(foregroundProfile, foregroundProfile, Mat());
-	dilate(foregroundProfile, foregroundProfile, Mat());
-	//~ imshow("Foreground - Profile", foregroundProfile);
-	
-	vector< vector<Point> > contours;
-	vector<Vec4i> hierarchy;
-	Mat thresholdOutput;
-	
-	threshold(foregroundProfile, thresholdOutput, 45, 255, THRESH_BINARY);
-	findContours(thresholdOutput, contours, hierarchy, CV_RETR_TREE,
-		CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-	
-	vector< vector<Point> > contoursPoly(contours.size());
-	vector<Rect> boundRect(contours.size());
-	
-	Mat drawing = Mat::zeros(thresholdOutput.size(), CV_8UC3);
-	double area;
-	int thresholdArea = 9500;
-	
-	for(size_t i = 0; i < contours.size(); i++){
-		area = contourArea(contours[i]);
-		
-		if(area > thresholdArea){
-			drawContours(drawing, contours, i, Scalar(255, 0, 0), 2, 8,
-				hierarchy, 0, Point());
-			boundRect[i] = boundingRect(contours[i]);
-			rectangle(image2, boundRect[i].tl(), boundRect[i].br(),
-				Scalar(0, 255, 0), 2, 8, 0);
-			Rect bodyROI(boundRect[i].tl(), boundRect[i].br());
-			Mat profileBodyROI = frame2(bodyROI);
-			faceDetectionProfile(frame2, profileBodyROI, image2, 
-				boundRect, model2, i);
-		}
-	}
-}
-
-void faceDetectionProfile(Mat frame2, Mat profileBodyROI, Mat image2, 
-	vector<Rect> boundRect, Ptr<FaceRecognizer> model2, size_t i)
-{
-	equalizeHist(profileBodyROI, profileBodyROI);
-	//~ imshow("Moving object 2", profileBodyROI);
-	
-	vector<Rect> profileFaces;
-	
-	frontalDetector.detectMultiScale(profileBodyROI, profileFaces, 1.1,
-		4, 0 | CASCADE_SCALE_IMAGE, Size(30, 30));
-		
-	for(size_t j = 0; j < profileFaces.size(); j++){
-		int faces_y1 = profileFaces[j].y + boundRect[i].y;
-		if (faces_y1 < 0){
-			faces_y1 = 0;
-		}
-		int faces_y2 = profileFaces[j].y + profileFaces[j].height + boundRect[i].y;
-		if (faces_y2 > profileBodyROI.rows){
-			faces_y2 = profileBodyROI.rows;
-		}
-		
-		Point f1(profileFaces[j].x + boundRect[i].x, faces_y1);
-		Point f2(profileFaces[j].x + profileFaces[j].width + boundRect[i].x, faces_y2);
-		rectangle(image2, f1, f2, Scalar(0, 0, 255), 2, 8, 0);
-		
-		Rect ROI(f1, f2);
-		Mat faceROI = frame2(ROI);
-		Mat faceSmallProfile;
-		
-		if(!faceROI.empty()){
-			if(faceROI.cols != 50){
-				resize(faceROI.clone(), faceSmallProfile, Size(50, 50));
-			}
-			else{
-				faceSmallProfile = faceROI.clone();
-			}
-			//~ imshow("Cropped image", faceSmallProfile);	
-			//~ if(framesPerDetection == 2){ //Capture the 2nd frame
-				time_t currentTime;
-				struct tm *localTime;
-				
-				//~ imshow("Saved image", faceSmallProfile);
-
-				time( &currentTime );                   // Get the current time
-				localTime = localtime( &currentTime );  // Convert the current time to the local time
-			
-				int Hour   = localTime->tm_hour;
-				int Min    = localTime->tm_min;
-				int Sec    = localTime->tm_sec;
-							
-				stringstream ss2, ssTimeTemp;
-				string fileName2, timeStampTemp;
-				ssTimeTemp << "Time: " << Hour << ":" << Min << ":" << Sec;
-				timeStampTemp = ssTimeTemp.str();
-				ssTimeTemp.str("");
-				if (timeStamp.compare(timeStampTemp) == 0){
-					ss2 << Hour << "-" << Min << "-" << Sec << "-profile" << ".pgm";
-					fileName2 = ss2.str();
-					ss2.str("");
-					imwrite(fileName2, faceSmallProfile);					
-					recognizeProfile(fileName2, model2);
-				}
-			//~ }
-			//~ imshow("Detected face", faceSmallProfile);
-		}
-		//~ else destroyWindow("Detected face");
-	}
-}
-
-void recognizeProfile(string fileName2, Ptr<FaceRecognizer> model2)
-{	
-	Mat scaledFace2 = imread(fileName2, CV_LOAD_IMAGE_UNCHANGED);
-	model2 -> predict(scaledFace2, label2, confidence2);
-	
-	//~ cout << confidence2 << endl;
-	
-	//~ string nameText = format("Name: ", label2);
-	//~ string statusText = format("Status: ", label2);
-	//~ 
-	//~ //To avoid false recognition, accept only the predictions within
-	//~ //a certain confidence level. 
-	//~ if(confidence2 < 1580){
-		//~ if(label2 >= 0 && label2 <= 9){
-			//~ nameText.append(databaseName[label2]);
-			//~ statusText.append(databaseStatus[label2]);
-		//~ }
-	//~ }
-	//~ else{
-		//~ nameText.append("Unknown");
-		//~ statusText.append("Unknown");
-	//~ }
-}
-
-
-
-int main(){
-	VideoCapture camera1, camera2;
-	camera1.open(0);
-	camera2.open("sidecam.avi");
-	
-	//Initialize MOG2 background subtraction for front face (pMOG1) and
-	//profile face (pMOG2)
-	Ptr<BackgroundSubtractorMOG2> pMOG1, pMOG2;
-	pMOG1 = createBackgroundSubtractorMOG2(1000, 64, false);
-	pMOG2 = createBackgroundSubtractorMOG2(1000, 64, false);
 	
 	//Load the cascades
-	if (!frontalDetector.load("haarcascade_frontalface_default.xml")){
-		cout << "--(!)Error loading faceDetector cascade." << endl;
-		exit(0);
-	}	
-	if (!profileDetector.load("haarcascade_profileface.xml")){
-		cout << "--(!)Error loading faceDetector cascade." << endl;
-		exit(0);
-	}
-	if (!eyeDetector.load("haarcascade_lefteye_2splits.xml")){
-		cout << "--(!)Error loading eyeDetector cascade." << endl;
-		exit(0);
-	}	
-		
-	//Load the face recognize algorithm
-	Ptr<FaceRecognizer> model1 = createEigenFaceRecognizer();
-	model1 -> load("frontFaceTrainer/eigenfaces_at.yml");
-	Ptr<FaceRecognizer> model2 = createEigenFaceRecognizer();
-	model2 -> load("sideFaceTrainer/eigenfaces_at.yml");
+	frontFaceDetector.load("haarcascade_frontalface_default.xml");
+	rightProfileDetector.load("haarcascade_profileface.xml");
 	
-	Mat frame1, image1;
-	Mat frame2, image2;
+	//Initialize MOG2 background subtraction 
+	Ptr<BackgroundSubtractorMOG2> pMOG2front, pMOG2profile;
+	pMOG2front = createBackgroundSubtractorMOG2(1000, 128, false);
+	pMOG2profile = createBackgroundSubtractorMOG2(1000, 35, false);
 	
-	for(;;){
+	//Load the face recognizer algorithm
+	Ptr<FaceRecognizer> modelFront = createFisherFaceRecognizer();
+	modelFront -> load("frontFaceTrainer/eigenfaces_at.yml");
+	Ptr<FaceRecognizer> modelProfile = createFisherFaceRecognizer();
+	modelProfile -> load("sideFaceTrainer/eigenfaces_at.yml");	
+	
+	Mat frame1, frame2, frame1_gray, frame2_gray, image1, image2, thresholdOut;
+	
+	vector< vector<Point> > contours_front, contours_profile;
+	vector<Vec4i> hierarchy;
+				
+	for(;;)
+	{
 		camera1 >> frame1;
 		camera2 >> frame2;
+		
 		if(!frame1.empty() && !frame2.empty()){
 			image1 = frame1.clone();
 			image2 = frame2.clone();
 			
-			backgroundSubtractionFrontal(frame1, image1, pMOG1, model1);
-			backgroundSubtractionProfile(frame2, image2, pMOG2, model2);
+			cvtColor(frame1, frame1_gray, CV_BGR2GRAY);
+			cvtColor(frame2, frame2_gray, CV_BGR2GRAY);
 			
-			imshow("Front face recognition", image1);
-			//~ imshow("Profile face recognition", image2);
+			////////////////////////////////////////////////////////////
+			
+			Mat thresh_front = backgroundSubtractFront(frame1_gray, pMOG2front);
+						
+			findContours(thresh_front, contours_front, hierarchy,
+				CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
+				
+			vector<Rect> boundRectFront(contours_front.size());			
+			double areaFrontContours;
+			
+			for(size_t f = 0; f < contours_front.size(); f ++){
+				areaFrontContours = contourArea(contours_front[f]);
+								
+				if(areaFrontContours > 850 && areaFrontContours < 20000){
+					//~ cout << "Front contour area: " << areaFrontContours << endl;
+					boundRectFront[f] = boundingRect(contours_front[f]);
+					rectangle(image1, boundRectFront[f].tl(), boundRectFront[f].br(),
+						Scalar(0,255,0), 2, 8, 0);
+					Rect roi_1(boundRectFront[f].tl(), boundRectFront[f].br());
+					Mat front_body_roi = frame1_gray(roi_1);		
+					detectFrontFaces(front_body_roi, boundRectFront, f, image1, frame1_gray, modelFront);			
+				}
+			}
+			
+			////////////////////////////////////////////////////////////
+			
+			Mat thresh_profile = backgroundSubtractProfile(frame2_gray, pMOG2profile);
+			
+			findContours(thresh_profile, contours_profile, hierarchy,
+				CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
+				
+			vector<Rect> boundRectProfile(contours_profile.size());			
+			double areaProfileContours;
+			
+			for(size_t p = 0; p < contours_profile.size(); p ++){
+				areaProfileContours = contourArea(contours_profile[p]);
+								
+				if(areaProfileContours > 1500 && areaProfileContours < 80000){
+					//~ cout << "Profile contour area: " << areaProfileContours << endl;
+					boundRectProfile[p] = boundingRect(contours_profile[p]);
+					rectangle(image2, boundRectProfile[p].tl(), boundRectProfile[p].br(),
+						Scalar(0,255,0), 2, 8, 0);
+					Rect roi_2(boundRectProfile[p].tl(), boundRectProfile[p].br());
+					Mat profile_body_roi = frame2_gray(roi_2);		
+					detectProfileFaces(profile_body_roi, boundRectProfile, p, image2, frame2_gray, modelProfile);			
+				}
+			}
+			
+			////////////////////////////////////////////////////////////
+			
+			if (isFrontFaceDetected == true || isProfileFaceDetected == true)
+			{
+				compareAndAnalyze();
+				cout << "Compared" << endl;
+			}
+											
+			imshow("Front face detection", image1);
+			imshow("Right profile detection", image2);
 		}
-		else exit(0);
+		
 		int c = waitKey(27);
 		if(27 == char(c)){
 			break;
-		}
+		}			
+				
 	}
+	
 	exit(0);
 }
