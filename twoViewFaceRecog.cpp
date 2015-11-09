@@ -333,12 +333,15 @@ void compareAndAnalyze()
 		nameText = format("Name: Unknown");
 		statusText = format("Status: Unknown");
 	}
+	
+	isFrontFaceDetected = false;
+	isProfileFaceDetected = false;
 		
-	if (isRunOnce){
-		cout << nameText << endl << statusText << endl << timeStamp << endl
-		     << "-----------------------------" << endl;	
+	//~ if (isRunOnce){
+		//~ cout << nameText << endl << statusText << endl << timeStamp << endl
+		     //~ << "-----------------------------" << endl;	
 		//~ isRunOnce = false;
-	}
+	//~ }
 }
 
 int main()	
