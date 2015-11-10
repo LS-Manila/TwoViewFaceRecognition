@@ -4,9 +4,15 @@
 
 * Explore other two face recognition algorithms (this will add data to Chapter 5): 
 
-[1] Ptr<FaceRecognizer> createEigenFaceRecognizer(int num_components=0, double threshold=DBL_MAX)¶
+[1] EigenFaceRecognizer
+```cpp
+Ptr<FaceRecognizer> createEigenFaceRecognizer(int num_components=0, double threshold=DBL_MAX)¶
+```
 
-[2] Ptr<FaceRecognizer> createLBPHFaceRecognizer(int radius=1, int neighbors=8, int grid_x=8, int grid_y=8, double threshold=DBL_MAX) 
+[2] LBPHFaceRecognizer
+```cpp
+Ptr<FaceRecognizer> createLBPHFaceRecognizer(int radius=1, int neighbors=8, int grid_x=8, int grid_y=8, double threshold=DBL_MAX) 
+```
 
 *  Save the 'confidence' value of your chosen face in a variable for both frontal and sideview images:
 
