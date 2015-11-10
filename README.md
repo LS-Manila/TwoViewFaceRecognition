@@ -71,3 +71,5 @@ if (confidenceChoice1 > frontalThreshold && confidenceChoice2 > sideThreshold)
 
 
 * You'll have to perform more experiments and gather more data. (At least 30 different people!)
+* Add Screenshots 
+* Update me with the accuracy
