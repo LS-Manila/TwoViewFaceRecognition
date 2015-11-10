@@ -1,5 +1,12 @@
 # 2-View Face Recognition
 
+## Past Screenshots:
+
+![alt tag](https://github.com/DeLaSalleUniversity-Manila/TwoViewFaceRecognition/blob/master/screenshots/facerec_2view.jpg)
+
+![alt tag](https://github.com/DeLaSalleUniversity-Manila/TwoViewFaceRecognition/blob/master/screenshots/facerec_2view2.jpg)
+
+
 ## TODO
 
 * Explore other two face recognition algorithms (this will add data to Chapter 5): 
