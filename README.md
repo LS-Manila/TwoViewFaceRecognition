@@ -64,7 +64,7 @@ void tallyFront(int label1, double confidence1){
 Maybe,
 
 ```cpp
-if (confidenceChoice1 > frontalThresh && confidenceChoice2 > sideThresh)
+if (confidenceChoice1 > frontalThreshold && confidenceChoice2 > sideThreshold)
   // Recognition success!
 ```
 
