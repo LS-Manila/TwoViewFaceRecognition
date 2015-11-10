@@ -191,7 +191,8 @@ void detectFrontFaces(Mat front_body_roi, vector<Rect>boundRectFront,
 
 		for(int i=0;i<10;i++)
 		{
-			if(array[i]>maxLabel1)
+			if(array[i]>
+			maxLabel1)
 			maxLabel1=array[i]; 
 		}
 	}
