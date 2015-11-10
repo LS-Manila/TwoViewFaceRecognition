@@ -2,7 +2,7 @@
 
 ## TODO
 
-* Try to Explore the other two face recognition algorithms (this will add data to Chapter 5): 
+* Explore other two face recognition algorithms (this will add data to Chapter 5): 
 
 [1] Ptr<FaceRecognizer> createEigenFaceRecognizer(int num_components=0, double threshold=DBL_MAX)¶
 
