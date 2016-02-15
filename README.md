@@ -1,6 +1,6 @@
 # 2-View Face Recognition
 
-##Profile Detection Using LBP-Trained Cascade
+##Profile Detection Using LBP-Trained Cascades
 
 ![alt tag](http://imgur.com/UM35ZJw.png)
 
