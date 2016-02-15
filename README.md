@@ -1,5 +1,19 @@
 # 2-View Face Recognition
 
+##Profile Detection Using LBP-Trained Cascade
+
+![alt tag](http://imgur.com/XAMSXAS)
+
+![alt tag](http://imgur.com/UM35ZJw)
+
+![alt tag](http://imgur.com/9j4A4Rx)
+
+![alt tag](http://imgur.com/y90pIGo)
+
+![alt tag](http://imgur.com/jB1b0wR)
+
+__________________________________________________________________________________________________________________________
+
 ## Past Screenshots:
 
 ![alt tag](https://github.com/DeLaSalleUniversity-Manila/TwoViewFaceRecognition/blob/master/screenshots/facerec_2view.jpg)
