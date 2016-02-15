@@ -2,7 +2,7 @@
 
 ##Profile Detection Using LBP-Trained Cascade
 
-![alt tag](http://imgur.com/XAMSXAS)
+![alt tag](http://i.imgur.com/XAMSXAS.png)
 
 ![alt tag](http://imgur.com/UM35ZJw)
 
