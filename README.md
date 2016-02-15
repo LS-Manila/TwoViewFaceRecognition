@@ -2,15 +2,13 @@
 
 ##Profile Detection Using LBP-Trained Cascade
 
-![alt tag](http://i.imgur.com/XAMSXAS.png)
+![alt tag](http://imgur.com/UM35ZJw.png)
 
-![alt tag](http://imgur.com/UM35ZJw)
+![alt tag](http://imgur.com/9j4A4Rx.png)
 
-![alt tag](http://imgur.com/9j4A4Rx)
+![alt tag](http://imgur.com/y90pIGo.png)
 
-![alt tag](http://imgur.com/y90pIGo)
-
-![alt tag](http://imgur.com/jB1b0wR)
+![alt tag](http://imgur.com/jB1b0wR.png)
 
 __________________________________________________________________________________________________________________________
 
